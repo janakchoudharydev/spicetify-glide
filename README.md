@@ -26,7 +26,7 @@
   *(Add a screenshot of the settings UI here)*  
   ![Glide Settings UI](assets/settings-ui.png)
 
-- **Customizable Timings**: Adjust the early start trigger and crossfade duration independently (1–15 seconds).
+- **Customizable Timing**: A single Glide slider (1–15 seconds) controls exactly when the next track starts early. The backend automatically syncs this duration with Spotify's native crossfade settings in the background.
 - **Profile Menu Integration**: Quick toggle to enable/disable Glide right from your Spotify profile dropdown.
 
 ---
@@ -54,20 +54,17 @@ You must have [Spicetify](https://spicetify.app/) installed and configured on yo
 
 ## ⚙️ Setup & Configuration
 
-**⚠️ CRITICAL STEP: Enable Spotify's Native Crossfade**  
-For Glide to work its magic, you must enable Spotify's built-in crossfade engine.
+**✨ It Just Works!**  
+For Glide to work its magic, Spotify's built-in crossfade engine needs to be on. Glide **automatically enables this in the background** for you!
 
-1. Open Spotify and go to **Settings > Playback**.
-2. Toggle on **Crossfade songs**.
-3. Set the slider to your preferred overlap duration (e.g., `5s`).
+You never have to touch Spotify's settings. Just use the Glide UI.
 
 ### Using the Glide UI
 
 Once installed, you'll see a lightning bolt icon (⚡) in your Spotify playbar. Click it to open the **Glide Settings**:
 
-- **Early Start ⏮️**: Controls how many seconds before the current song ends to skip to the next song.
-- **Crossfade Duration 🔊**: Controls how long the audio overlap lasts (this should match whatever you set in Spotify's Settings).
-- **Test Transition 🧪**: Click this while a song is playing to instantly test your crossfade settings!
+- **Glide 🔊**: A single slider that controls how many seconds before the current song ends to skip to the next song. This defines the duration of the audio overlap.
+- **Enable Glide**: A master toggle to quickly turn transitions on or off.
 
 ---
 
@@ -93,8 +90,8 @@ By simply skipping early and letting Spotify handle the audio mixing, you get a 
 ## 🛠️ Troubleshooting
 
 - **Transitions aren't happening:** Ensure Glide is toggled ON (the playbar icon should be green).
-- **The song skips, but there's a gap/silence:** You forgot to enable "Crossfade songs" in Spotify's main Settings menu!
-- **Transitions trigger too early/late:** Adjust the "Early Start" slider in the Glide settings menu to fine-tune the timing.
+- **The song skips, but there's a gap/silence:** Try manually enabling "Crossfade songs" in Spotify's settings (Settings > Playback). While Glide attempts to do this automatically, some older Spotify versions may require you to enable it manually.
+- **Transitions trigger too early/late:** Adjust the "Glide" slider in the Glide settings menu to fine-tune the timing.
 
 ---
 
