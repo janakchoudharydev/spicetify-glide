@@ -5,7 +5,7 @@
 **Apple Music-style seamless transitions for Spotify desktop.**
 
 [![Spicetify](https://img.shields.io/badge/Spicetify-Extension-1DB954?logo=spotify&logoColor=white)](#)
-[![Version](https://img.shields.io/badge/Version-3.0.0-blue)](#)
+[![Version](https://img.shields.io/badge/Version-3.1-blue)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#)
 
 </div>
