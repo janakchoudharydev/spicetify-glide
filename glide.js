@@ -95,65 +95,57 @@
         }
     }
 
-    // ─── Spotify Native Crossfade Control ────────────────────────────
-    // Spotify has a built-in crossfade engine that does TRUE audio overlap
-    // at the audio-pipeline level. We try to enable + configure it.
-    //
-    // API paths (Spotify internals, may vary by version):
-    //   - Spicetify.Platform.PlayerAPI._prefs
-    //   - sp://player/v2/main (cosmos)
-    //   - DOM: Settings > Playback > Crossfade songs
-    //
-    async function enableSpotifyCrossfade() {
+    // ─── Zero-Touch Auto-Crossfade Guardian ──────────────────────────
+    // Aggressively ensures Spotify's native crossfade is ON without user action.
+    async function enforceCrossfade() {
+        if (!isEnabled) return;
+        const durationMs = crossfadeSec * 1000;
+
         try {
-            // Method 1: Try Platform.PlayerAPI
-            if (Spicetify.Platform?.PlayerAPI?._prefs) {
-                const prefs = Spicetify.Platform.PlayerAPI._prefs;
-                if (typeof prefs.setCrossfade === "function") {
-                    prefs.setCrossfade(true, crossfadeSec);
-                    spotifyCrossfadeStatus = "enabled";
-                    log("Crossfade enabled via PlayerAPI._prefs.setCrossfade()");
-                    return true;
-                }
+            // Layer 1: The Modern XPUI ConfigAPI
+            if (Spicetify.Platform?.ConfigAPI?.setAccountSetting) {
+                await Spicetify.Platform.ConfigAPI.setAccountSetting("audio.crossfade_v2", true);
+                await Spicetify.Platform.ConfigAPI.setAccountSetting("audio.crossfade.time_v2", durationMs);
+                log("Zero-Touch: ConfigAPI forced crossfade ON");
+                return true;
             }
         } catch (e) {
-            warn("PlayerAPI crossfade method not available:", e.message);
+            warn("Zero-Touch: ConfigAPI hook failed:", e.message);
         }
 
         try {
-            // Method 2: Try cosmos prefs API
+            // Layer 2: PlayerAPI Preferences
+            if (Spicetify.Platform?.PlayerAPI?._prefs?.setCrossfade) {
+                Spicetify.Platform.PlayerAPI._prefs.setCrossfade(true, crossfadeSec);
+                log("Zero-Touch: PlayerAPI forced crossfade ON");
+                return true;
+            }
+        } catch (e) {
+            warn("Zero-Touch: PlayerAPI hook failed:", e.message);
+        }
+
+        try {
+            // Layer 3: Cosmos Main Override
             await Spicetify.CosmosAsync.post("sp://player/v2/main", {
-                crossfade: {
-                    enabled: true,
-                    duration_ms: crossfadeSec * 1000,
-                }
+                crossfade: { enabled: true, duration_ms: durationMs }
             });
-            spotifyCrossfadeStatus = "enabled";
-            log("Crossfade enabled via cosmos sp://player/v2/main");
+            log("Zero-Touch: Cosmos forced crossfade ON");
             return true;
         } catch (e) {
-            warn("Cosmos crossfade method not available:", e.message);
+            warn("Zero-Touch: Cosmos Main hook failed:", e.message);
         }
 
         try {
-            // Method 3: Try the connect player prefs path
+            // Layer 4: Cosmos Connect Override
             await Spicetify.CosmosAsync.put("sp://connect/v1/player/crossfade", {
-                enabled: true,
-                duration_ms: crossfadeSec * 1000,
+                enabled: true, duration_ms: durationMs
             });
-            spotifyCrossfadeStatus = "enabled";
-            log("Crossfade enabled via cosmos sp://connect/v1/player/crossfade");
+            log("Zero-Touch: Connect forced crossfade ON");
             return true;
         } catch (e) {
-            warn("Connect crossfade method not available:", e.message);
+            warn("Zero-Touch: Cosmos Connect hook failed:", e.message);
         }
 
-        // If all programmatic methods fail, we still proceed.
-        // The early skip will work regardless, and if the user
-        // manually enables crossfade in Settings > Playback,
-        // they'll get the full Apple Music experience.
-        spotifyCrossfadeStatus = "manual";
-        warn("Could not programmatically enable crossfade. User should enable it in Settings > Playback.");
         return false;
     }
 
@@ -196,7 +188,15 @@
         Spicetify.showNotification("🎵 Glide → next track");
 
         try {
-            Spicetify.Player.next();
+            // Just-In-Time Guardian: Ensure Spotify's native crossfade is ON right before we skip.
+            // Even if the user turned it off 10 minutes ago in settings, this forces it back on
+            // invisibly to mix this specific transition perfectly.
+            enforceCrossfade();
+
+            // Wait a tiny moment for Cosmos/Prefs to sync state before skipping
+            setTimeout(() => {
+                Spicetify.Player.next();
+            }, 50);
         } catch (e) {
             err("Player.next() failed:", e);
             hasSkipped = false;
@@ -304,7 +304,7 @@
             earlyStartSec = v;
             crossfadeSec = v;   // keep crossfade in sync with the single slider
             saveSettings();
-            enableSpotifyCrossfade(); // silently sync Spotify's crossfade duration
+            enforceCrossfade(); // silently sync Spotify's crossfade duration
         });
 
         const toggle = container.querySelector("#g-toggle");
@@ -402,7 +402,7 @@
     initMenu();
 
     // Try to enable Spotify's native crossfade
-    enableSpotifyCrossfade();
+    enforceCrossfade();
 
     // Register event listeners
     Spicetify.Player.addEventListener("onprogress", onProgressChange);
