@@ -396,6 +396,126 @@
         } catch (e) { err("Menu init failed:", e); }
     }
 
+    // ─── Auto-Update Notification System ─────────────────────────────
+    // Checks the raw GitHub manifest.json to see if a newer version is available.
+    async function checkForUpdates() {
+        try {
+            const currentVersion = "3.1.0";
+            const manifestUrl = "https://raw.githubusercontent.com/janakchoudharydev/spicetify-glide/main/manifest.json";
+
+            const response = await fetch(manifestUrl, { cache: "no-store" });
+            if (!response.ok) return;
+
+            const manifest = await response.json();
+            const remoteVersion = manifest.version;
+
+            if (!remoteVersion) return;
+
+            // Simple semantic version check (assumes X.Y.Z format)
+            const isNewer = (local, remote) => {
+                const lParts = local.split('.').map(Number);
+                const rParts = remote.split('.').map(Number);
+                for (let i = 0; i < Math.max(lParts.length, rParts.length); i++) {
+                    const l = lParts[i] || 0;
+                    const r = rParts[i] || 0;
+                    if (r > l) return true;
+                    if (r < l) return false;
+                }
+                return false;
+            };
+
+            if (isNewer(currentVersion, remoteVersion)) {
+                // Check if user already dismissed this specific version
+                const dismissedVersion = Spicetify.LocalStorage.get("glide:dismissed_version");
+                if (dismissedVersion === remoteVersion) {
+                    log(`Update to ${remoteVersion} available, but was previously dismissed.`);
+                    return;
+                }
+
+                log(`Update available! Current: ${currentVersion}, Remote: ${remoteVersion}`);
+
+                // Build the PopupModal DOM
+                const container = document.createElement("div");
+                container.innerHTML = `
+                    <style>
+                        .g-upd-container {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 16px;
+                            color: var(--spice-text);
+                        }
+                        .g-upd-text {
+                            font-size: 14px;
+                            line-height: 1.5;
+                        }
+                        .g-upd-buttons {
+                            display: flex;
+                            justify-content: flex-end;
+                            gap: 12px;
+                            margin-top: 8px;
+                        }
+                        .g-upd-btn {
+                            padding: 8px 16px;
+                            border-radius: 4px;
+                            border: none;
+                            font-weight: bold;
+                            cursor: pointer;
+                            font-size: 14px;
+                        }
+                        .g-upd-btn-primary {
+                            background-color: var(--spice-button);
+                            color: var(--spice-button-active);
+                        }
+                        .g-upd-btn-primary:hover {
+                            background-color: var(--spice-button-active);
+                            color: var(--spice-main);
+                        }
+                        .g-upd-btn-secondary {
+                            background-color: transparent;
+                            color: var(--spice-subtext);
+                        }
+                        .g-upd-btn-secondary:hover {
+                            color: var(--spice-text);
+                        }
+                    </style>
+                    <div class="g-upd-container">
+                        <div class="g-upd-text">
+                            A new version of Glide is available! You're currently running <b>v${currentVersion}</b>, and the latest version is <b>v${remoteVersion}</b>.
+                            <br><br>
+                            If you installed via the Spicetify Marketplace, it will update automatically soon. Otherwise, you can manually pull from GitHub.
+                        </div>
+                        <div class="g-upd-buttons">
+                            <button class="g-upd-btn g-upd-btn-secondary" id="g-upd-skip">Skip this version</button>
+                            <button class="g-upd-btn g-upd-btn-secondary" id="g-upd-later">Remind me later</button>
+                            <button class="g-upd-btn g-upd-btn-primary" id="g-upd-now">Open GitHub</button>
+                        </div>
+                    </div>
+                `;
+
+                container.querySelector("#g-upd-now").addEventListener("click", () => {
+                    window.open("https://github.com/janakchoudharydev/spicetify-glide", "_blank");
+                    Spicetify.PopupModal.hide();
+                });
+
+                container.querySelector("#g-upd-later").addEventListener("click", () => {
+                    Spicetify.PopupModal.hide();
+                });
+
+                container.querySelector("#g-upd-skip").addEventListener("click", () => {
+                    Spicetify.LocalStorage.set("glide:dismissed_version", remoteVersion);
+                    Spicetify.PopupModal.hide();
+                });
+
+                Spicetify.PopupModal.display({
+                    title: "🚀 New Glide Version Available!",
+                    content: container,
+                });
+            }
+        } catch (e) {
+            warn("Failed to check for updates:", e.message);
+        }
+    }
+
     // ─── Initialize ──────────────────────────────────────────────────
     loadSettings();
     initPlaybarButton();
@@ -421,4 +541,7 @@
         crossfade: crossfadeSec + "s",
         spotifyCrossfade: spotifyCrossfadeStatus,
     });
+
+    // Check for updates in the background
+    checkForUpdates();
 })();

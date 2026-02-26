@@ -1,14 +1,20 @@
 {
-  "name": "Glide",
-  "description": "Apple Music-style seamless transitions. True audio overlap via native crossfade.",
-  "preview": "assets/demo.png",
-  "main": "glide.js",
-  "readme": "README.md",
-  "authors": [
-    {
-      "name": "Janak Choudhary",
-      "url": "https://github.com/janakchoudharydev"
-    }
-  ],
-  "tags": ["extension", "ui", "audio", "crossfade"]
+    "name": "Glide",
+    "description": "Apple Music-style seamless transitions. True audio overlap via native crossfade.",
+    "preview": "assets/demo.png",
+    "main": "glide.js",
+    "readme": "README.md",
+    "authors": [
+        {
+            "name": "Janak Choudhary",
+            "url": "https://github.com/janakchoudharydev"
+        }
+    ],
+    "tags": [
+        "extension",
+        "ui",
+        "audio",
+        "crossfade"
+    ],
+    "version": "3.1.0"
 }
