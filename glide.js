@@ -1,142 +1,82 @@
 // NAME: Glide
 // AUTHOR: Project Glide
-// VERSION: 4.2.0
-// DESCRIPTION: AuraMix engine — Apple Music-style crossfade via Web Audio API GainNode. No Player.setVolume(). Both songs overlap at the audio-graph level. Beat-synced, key-aware smart trigger.
+// VERSION: 3.0.0
+// DESCRIPTION: AuraMix — Apple Music-style transitions. Smart early skip using Spotify audio analysis (BPM, key, loudness). Spotify's native crossfade handles all audio mixing. Zero volume manipulation.
 
 /// <reference path="../cli/globals.d.ts" />
 
 (async function Glide() {
     // ─── Wait for Spicetify APIs ─────────────────────────────────────
-    const needed = [
-        Spicetify?.Player?.addEventListener,
-        Spicetify?.Player?.getProgress,
-        Spicetify?.Player?.getDuration,
-        Spicetify?.Player?.next,
-        Spicetify?.Player?.isPlaying,
-        Spicetify?.Playbar,
-        Spicetify?.PopupModal,
-        Spicetify?.LocalStorage,
-        Spicetify?.getAudioData,
-        Spicetify?.Queue,
-    ];
-    if (needed.some((x) => !x)) {
+    if (
+        !Spicetify?.Player?.addEventListener ||
+        !Spicetify?.Player?.getProgress ||
+        !Spicetify?.Player?.getDuration ||
+        !Spicetify?.Player?.next ||
+        !Spicetify?.Player?.isPlaying ||
+        !Spicetify?.Playbar ||
+        !Spicetify?.PopupModal ||
+        !Spicetify?.LocalStorage ||
+        !Spicetify?.getAudioData ||
+        !Spicetify?.Queue
+    ) {
         setTimeout(Glide, 300);
         return;
     }
 
     // ─── Logger ──────────────────────────────────────────────────────
-    const TAG = "[AuraMix]";
+    const TAG = "[Glide]";
     const log = (...a) => console.log(`%c${TAG}`, "color:#1DB954;font-weight:bold", ...a);
     const warn = (...a) => console.warn(TAG, ...a);
     const err = (...a) => console.error(TAG, ...a);
 
     // ─── Constants ───────────────────────────────────────────────────
     const STORE = { ENABLED: "glide:enabled", TIMING: "glide:timing" };
-    const DEFAULT_TIMING = 5;
+    const DEFAULT_TIMING = 5;    // seconds
     const MIN_TIMING = 1;
     const MAX_TIMING = 15;
     const HEARTBEAT_MS = 400;
     const MIN_TRACK_MS = 30000;
-    const BPM_TOLERANCE = 0.05;    // ±5%
-    const LOAD_SETTLE_MS = 250;     // Time for Spotify to start the new track
-
-    // ─── Web Audio API Crossfade engine ──────────────────────────────
-    //
-    // We tap Spotify's <audio> element and insert a GainNode into the
-    // audio graph. Fading the gain causes a smooth, natural volume ramp
-    // that is COMPLETELY INVISIBLE to Spotify's UI volume slider.
-    //
-    //   <audio> ──► MediaElementSource ──► GainNode ──► AudioContext.destination
-    //
-    // IMPORTANT: We initialize lazily — only when the first transition fires.
-    // The <audio> element may not exist at Spicetify extension load time.
-    //
-    let audioCtx = null;
-    let gainNode = null;
-    let mediaSource = null;
-    let webAudioReady = false;
-
-    function initWebAudio() {
-        if (webAudioReady) return true;  // already initialized
-        const audioEl = document.querySelector("audio");
-        if (!audioEl) { warn("No <audio> element found — web audio unavailable"); return false; }
-        try {
-            audioCtx = new AudioContext();
-            mediaSource = audioCtx.createMediaElementSource(audioEl);
-            gainNode = audioCtx.createGain();
-            gainNode.gain.value = 1;
-            mediaSource.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            webAudioReady = true;
-            log("✅ Web Audio GainNode injected into Spotify's audio pipeline");
-            return true;
-        } catch (ex) {
-            err("Web Audio init failed:", ex.message);
-            audioCtx = gainNode = mediaSource = null;
-            return false;
-        }
-    }
-
-    // Smooth gain ramp — exponential sounds more natural than linear
-    function rampGain(targetValue, durationSec) {
-        if (!gainNode || !audioCtx) return;
-        const now = audioCtx.currentTime;
-        gainNode.gain.cancelScheduledValues(now);
-        gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-        // Can't exponential ramp to 0, so use linear for silence
-        if (targetValue === 0) {
-            gainNode.gain.linearRampToValueAtTime(0.0001, now + durationSec);
-        } else {
-            gainNode.gain.linearRampToValueAtTime(Math.max(0.0001, targetValue), now + durationSec);
-        }
-    }
-
-    function setGainImmediate(value) {
-        if (!gainNode || !audioCtx) return;
-        gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
-        gainNode.gain.setValueAtTime(Math.max(0.0001, value), audioCtx.currentTime);
-    }
+    const BPM_TOLERANCE = 0.05; // ±5%
 
     // ─── Camelot Wheel ───────────────────────────────────────────────
-    const PITCH_TO_CAMELOT = [
-        { n: 8, l: "B" }, // C
-        { n: 3, l: "B" }, // C#
-        { n: 10, l: "B" }, // D
-        { n: 5, l: "B" }, // D#
-        { n: 12, l: "B" }, // E
-        { n: 7, l: "B" }, // F
-        { n: 2, l: "B" }, // F#
-        { n: 9, l: "B" }, // G
-        { n: 4, l: "B" }, // G#
-        { n: 11, l: "B" }, // A
-        { n: 6, l: "B" }, // A#
-        { n: 1, l: "B" }, // B
+    // Maps Spotify's pitch class integers to Camelot numbers for harmonic key matching.
+    const CAMELOT = [
+        { n: 8, l: "B" }, // 0  C
+        { n: 3, l: "B" }, // 1  C#
+        { n: 10, l: "B" }, // 2  D
+        { n: 5, l: "B" }, // 3  D#
+        { n: 12, l: "B" }, // 4  E
+        { n: 7, l: "B" }, // 5  F
+        { n: 2, l: "B" }, // 6  F#
+        { n: 9, l: "B" }, // 7  G
+        { n: 4, l: "B" }, // 8  G#
+        { n: 11, l: "B" }, // 9  A
+        { n: 6, l: "B" }, // 10 A#
+        { n: 1, l: "B" }, // 11 B
     ];
-    function pitchToCamelot(key, mode) {
+    function toCamelot(key, mode) {
         if (key < 0 || key > 11) return null;
-        const e = PITCH_TO_CAMELOT[key];
-        return { n: e.n, l: mode === 1 ? "B" : "A" };
+        return { n: CAMELOT[key].n, l: mode === 1 ? "B" : "A" };
     }
-    function camelotCompatible(a, b) {
+    function camelotMatch(a, b) {
         if (!a || !b) return false;
-        if (a.n === b.n && a.l === b.l) return true;
-        if (a.l === b.l && Math.abs(a.n - b.n) <= 1) return true;
-        if (a.l === b.l && Math.max(a.n, b.n) === 12 && Math.min(a.n, b.n) === 1) return true;
-        if (a.n === b.n && a.l !== b.l) return true;
+        if (a.n === b.n && a.l === b.l) return true;                         // same key
+        if (a.l === b.l && Math.abs(a.n - b.n) <= 1) return true;            // ±1 adjacent
+        if (a.l === b.l && Math.max(a.n, b.n) === 12 && Math.min(a.n, b.n) === 1) return true; // wrap
+        if (a.n === b.n && a.l !== b.l) return true;                         // parallel key
         return false;
     }
 
-    // ─── State ────────────────────────────────────────────────────────
+    // ─── State ───────────────────────────────────────────────────────
     let isEnabled = true;
     let timingSec = DEFAULT_TIMING;
-    let isTransitioning = false;
-    let hasTriggered = false;
+    let hasSkipped = false;             // Prevents double-triggering
     let currentSongUri = null;
-    const analysisCache = new Map();
+    let currentTriggerMs = null;           // Calculated smart trigger in ms
+    let currentCompatResult = null;
+    const analysisCache = new Map();        // uri → AnalysisResult
     let nextTrackUri = null;
     let nextTrackAnalysis = null;
-    let currentTriggerMs = null;
-    let currentCompatResult = null;
 
     // ─── Settings ────────────────────────────────────────────────────
     function loadSettings() {
@@ -148,10 +88,9 @@
                 const v = parseFloat(t);
                 if (!isNaN(v) && v >= MIN_TIMING && v <= MAX_TIMING) timingSec = v;
             }
-            log("Settings:", { isEnabled, timingSec });
+            log("Loaded:", { isEnabled, timingSec });
         } catch (ex) { err("loadSettings:", ex); }
     }
-
     function saveSettings() {
         try {
             Spicetify.LocalStorage.set(STORE.ENABLED, String(isEnabled));
@@ -159,20 +98,35 @@
         } catch (ex) { err("saveSettings:", ex); }
     }
 
-    // ─── Auto-Enable Spotify Native Crossfade (bonus layer) ──────────
-    // Even if our GainNode handles fading, Spotify's native crossfade
-    // also helps with buffering the next track. Try to enable it.
+    // ─── Auto-Enable Spotify Native Crossfade ────────────────────────
+    //
+    // Spotify already has a built-in crossfade engine (see Settings → Playback).
+    // When crossfade is enabled and we call Player.next() EARLY, both Song A
+    // and Song B overlap at the audio engine level — exactly like Apple Music.
+    //
+    // We try to enable this silently in the background so the user never needs
+    // to touch Spotify's settings manually.
+    //
     async function autoEnableCrossfade() {
         const ms = Math.round(timingSec * 1000);
+        // Method 1: Direct player prefs
         try {
             const prefs = Spicetify.Platform?.PlayerAPI?._prefs;
-            if (prefs?.setCrossfade) { prefs.setCrossfade(true, ms); return; }
+            if (prefs?.setCrossfade) { prefs.setCrossfade(true, ms); log("✅ Crossfade via PlayerAPI._prefs"); return; }
         } catch (_) { }
+        // Method 2: Cosmos async
         try {
-            await Spicetify.CosmosAsync?.post("sp://player/v2/main", {
-                crossfade: { enabled: true, duration_ms: ms }
-            });
+            await Spicetify.CosmosAsync.post("sp://player/v2/main", { crossfade: { enabled: true, duration_ms: ms } });
+            log("✅ Crossfade via cosmos");
+            return;
         } catch (_) { }
+        // Method 3: Connect API
+        try {
+            await Spicetify.CosmosAsync.put("sp://connect/v1/player/crossfade", { enabled: true, duration_ms: ms });
+            log("✅ Crossfade via connect");
+            return;
+        } catch (_) { }
+        warn("Could not auto-enable crossfade. Enable manually: Spotify Settings → Playback → Crossfade songs.");
     }
 
     // ─── Audio Analysis ───────────────────────────────────────────────
@@ -181,126 +135,81 @@
         if (analysisCache.has(uri)) return analysisCache.get(uri);
         let raw;
         try { raw = await Spicetify.getAudioData(uri); }
-        catch (ex) { warn("getAudioData:", uri, ex.message); return null; }
+        catch (ex) { warn("getAudioData:", ex.message); return null; }
         if (!raw) return null;
+
         const track = raw.track || {};
         const sections = raw.sections || [];
         const bars = raw.bars || [];
+
+        // Find outro: last section whose loudness is below the track average
         const avgLoudness = sections.reduce((s, x) => s + (x.loudness || 0), 0) / (sections.length || 1);
         const outroSection = sections.slice().reverse().find(s => s.loudness <= avgLoudness)
             || sections[sections.length - 1];
+
         const result = {
-            uri,
             tempo: track.tempo || 120,
             key: track.key ?? -1,
             mode: track.mode ?? 1,
-            camelot: pitchToCamelot(track.key ?? -1, track.mode ?? 1),
+            camelot: toCamelot(track.key ?? -1, track.mode ?? 1),
             outroStart: outroSection ? Math.round(outroSection.start * 1000) : null,
             bars,
         };
         analysisCache.set(uri, result);
-        log(`🎵 Analyzed | BPM=${result.tempo.toFixed(1)} | Camelot=${JSON.stringify(result.camelot)} | Outro@${result.outroStart}ms`);
+        log(`🎵 ${uri.split(":")?.[2]?.slice(-6)} | BPM=${result.tempo.toFixed(1)} | Camelot=${JSON.stringify(result.camelot)} | Outro@${result.outroStart}ms`);
         return result;
     }
 
-    function checkCompatibility(a, b) {
+    function checkCompat(a, b) {
         if (!a || !b) return { bpmMatch: false, keyMatch: false };
         const bpmMatch = Math.abs(a.tempo - b.tempo) / a.tempo <= BPM_TOLERANCE;
-        const keyMatch = camelotCompatible(a.camelot, b.camelot);
-        log(`🔍 Compat | BPM=${bpmMatch} | Key=${keyMatch}`);
+        const keyMatch = camelotMatch(a.camelot, b.camelot);
+        log(`🔍 BPM ${bpmMatch ? "✓" : "✗"} (${a.tempo.toFixed(1)}↔${b.tempo.toFixed(1)}) | Key ${keyMatch ? "✓" : "✗"}`);
         return { bpmMatch, keyMatch };
     }
 
-    function calculateTriggerPoint(analysisA, compat, durationMs) {
-        if (!analysisA || !durationMs) return null;
+    // ─── Smart Trigger ────────────────────────────────────────────────
+    // Determines the ms position in Song A at which to call Player.next().
+    // Priority: beat-boundary → outro section → fixed fallback.
+    function calcTrigger(analysis, compat, durationMs) {
+        if (!analysis || !durationMs) return null;
         const timingMs = timingSec * 1000;
-        if (compat?.bpmMatch && analysisA.bars.length > 0) {
-            const targetMs = durationMs - timingMs;
+
+        // Beat-synced: snap to the last bar boundary before (end - timingMs)
+        if (compat?.bpmMatch && analysis.bars.length > 0) {
+            const target = durationMs - timingMs;
             let bestBar = null;
-            for (const bar of analysisA.bars) {
+            for (const bar of analysis.bars) {
                 const bMs = Math.round(bar.start * 1000);
-                if (bMs <= targetMs) bestBar = bMs;
+                if (bMs <= target) bestBar = bMs;
             }
-            if (bestBar !== null) {
-                log(`🥁 Beat-synced trigger: ${bestBar}ms`);
-                return bestBar;
-            }
+            if (bestBar !== null) { log(`🥁 Beat trigger: ${bestBar}ms`); return bestBar; }
         }
-        if (analysisA.outroStart && analysisA.outroStart < durationMs - 2000) {
-            log(`🎼 Outro trigger: ${analysisA.outroStart}ms`);
-            return analysisA.outroStart;
+
+        // Outro section: natural musical fade point
+        if (analysis.outroStart && analysis.outroStart < durationMs - 2000) {
+            log(`🎼 Outro trigger: ${analysis.outroStart}ms`);
+            return analysis.outroStart;
         }
+
+        // Simple fallback
         const fb = Math.max(0, durationMs - timingMs);
         log(`⏱ Fallback trigger: ${fb}ms`);
         return fb;
     }
 
-    // ─── Execute Transition ───────────────────────────────────────────
-    //
-    // HOW THE CROSSFADE WORKS (no Player.setVolume() at all):
-    //
-    //   Phase A: Fade out Song A via GainNode  (~timingSec/3 seconds)
-    //            GainNode.gain goes 1.0 → 0
-    //            Spotify's audio plays, volume bar UNCHANGED
-    //
-    //   Phase B: Player.next() — Song B starts loading
-    //            GainNode.gain is still 0 (silence during buffer)
-    //
-    //   Phase C: Fade in Song B via GainNode (~timingSec seconds)
-    //            GainNode.gain goes 0 → 1.0
-    //            Smooth, natural ramp — no user-visible volume change
-    //
-    async function executeTransition() {
-        if (isTransitioning) return;
-        isTransitioning = true;
-        hasTriggered = true;
-
-        // Lazy-initialize Web Audio now that Spotify is definitely playing audio
-        if (!webAudioReady) initWebAudio();
-
-        const remaining = Spicetify.Player.getDuration() - Spicetify.Player.getProgress();
-        log(`⏭ Transition | Song A has ${(remaining / 1000).toFixed(1)}s left`);
-
-        const fadeOutDuration = Math.max(0.5, timingSec / 3);  // quick fade out
-        const fadeInDuration = timingSec;                      // gradual fade in
-
-        try {
-            if (webAudioReady && gainNode) {
-                // Phase A: Smooth fade out via GainNode (NOT setVolume)
-                log(`Phase A: GainNode fade out over ${fadeOutDuration.toFixed(1)}s`);
-                rampGain(0, fadeOutDuration);
-                await new Promise(r => setTimeout(r, fadeOutDuration * 1000));
-
-                // Phase B: Skip to next track
-                log("Phase B: Player.next()");
-                try { Spicetify.Player.next(); }
-                catch (ex) { err("next():", ex); isTransitioning = false; setGainImmediate(1); return; }
-
-                // Give Spotify time to start buffering Song B
-                await new Promise(r => setTimeout(r, LOAD_SETTLE_MS));
-
-                // Phase C: Smooth fade in via GainNode
-                log(`Phase C: GainNode fade in over ${fadeInDuration.toFixed(1)}s`);
-                rampGain(1, fadeInDuration);
-                await new Promise(r => setTimeout(r, fadeInDuration * 1000));
-                setGainImmediate(1);
-
-            } else {
-                // Fallback: no Web Audio (e.g. browser blocks it), just skip
-                warn("Web Audio not available — hard skip only");
-                try { Spicetify.Player.next(); } catch (_) { }
-            }
-        } catch (ex) {
-            err("Transition error:", ex);
-            if (gainNode) setGainImmediate(1); // restore audio
-        }
-
-        isTransitioning = false;
-        log("✅ Crossfade complete");
+    // ─── Execute Skip ────────────────────────────────────────────────
+    // This is ALL we do. Spotify's native crossfade handles the rest.
+    function executeSkip() {
+        hasSkipped = true;
+        const remaining = (Spicetify.Player.getDuration() - Spicetify.Player.getProgress()) / 1000;
+        log(`⏭ EARLY SKIP | Song A has ${remaining.toFixed(1)}s left | Spotify crossfade mixes audio`);
+        try { Spicetify.Player.next(); }
+        catch (ex) { err("next() failed:", ex); hasSkipped = false; }
     }
 
     // ─── Pre-fetch & Plan ─────────────────────────────────────────────
-    async function prefetchNextTrack() {
+    async function prefetchNext() {
         const queue = Spicetify.Queue?.nextTracks;
         if (!queue?.length) { nextTrackUri = null; nextTrackAnalysis = null; return; }
         const c = queue[0];
@@ -308,60 +217,47 @@
         if (!uri || uri === nextTrackUri) return;
         nextTrackUri = uri;
         nextTrackAnalysis = await analyzeTrack(uri);
-        log("📥 Pre-fetched next:", uri.split(":")?.[2]?.slice(-6));
     }
 
     async function planTransition() {
-        hasTriggered = false;
+        hasSkipped = false;
         currentTriggerMs = null;
         currentCompatResult = null;
         const uri = Spicetify.Player?.data?.item?.uri;
         const duration = Spicetify.Player.getDuration();
         if (!duration || duration < MIN_TRACK_MS) return;
         const analysisA = await analyzeTrack(uri);
-        await prefetchNextTrack();
-        const compat = checkCompatibility(analysisA, nextTrackAnalysis);
+        await prefetchNext();
+        const compat = checkCompat(analysisA, nextTrackAnalysis);
         currentCompatResult = compat;
-        currentTriggerMs = calculateTriggerPoint(analysisA, compat, duration);
-        log(`📋 Plan | trigger=${currentTriggerMs}ms / ${duration}ms`);
+        currentTriggerMs = calcTrigger(analysisA, compat, duration);
+        log(`📋 Plan | trigger=${currentTriggerMs}ms | duration=${duration}ms`);
     }
 
     // ─── Progress Monitor ─────────────────────────────────────────────
     function checkProgress() {
-        if (!isEnabled || isTransitioning || hasTriggered) return;
+        if (!isEnabled || hasSkipped) return;
         if (!Spicetify.Player.isPlaying()) return;
         let progress, duration;
         try { progress = Spicetify.Player.getProgress(); duration = Spicetify.Player.getDuration(); }
         catch (_) { return; }
         if (!duration || duration < MIN_TRACK_MS || progress < 3000) return;
         if (currentTriggerMs !== null) {
-            if (progress >= currentTriggerMs) {
-                log(`🎯 Smart trigger! ${progress}ms ≥ ${currentTriggerMs}ms`);
-                executeTransition();
-            }
+            if (progress >= currentTriggerMs) executeSkip();
             return;
         }
-        const remaining = duration - progress;
-        if (remaining <= timingSec * 1000) {
-            log(`⏱ Fallback trigger | ${(remaining / 1000).toFixed(1)}s left`);
-            executeTransition();
-        }
+        if (duration - progress <= timingSec * 1000) executeSkip();
     }
 
-    // ─── Event Handlers ───────────────────────────────────────────────
     function onSongChange() {
-        const newUri = Spicetify.Player?.data?.item?.uri;
-        if (newUri === currentSongUri) return;
-        currentSongUri = newUri;
-        isTransitioning = false;
-        hasTriggered = false;
-        // Ensure gain is restored to 1 on song change
-        if (gainNode && audioCtx) setGainImmediate(1);
-        log("🎵 Song changed:", newUri?.split(":")?.[2]?.slice(-6));
+        const uri = Spicetify.Player?.data?.item?.uri;
+        if (uri === currentSongUri) return;
+        currentSongUri = uri;
+        log("🎵 New track:", uri?.split(":")?.[2]?.slice(-6));
         planTransition();
     }
 
-    setInterval(() => { if (isEnabled && !isTransitioning) checkProgress(); }, HEARTBEAT_MS);
+    setInterval(checkProgress, HEARTBEAT_MS);
     Spicetify.Player.addEventListener("onprogress", checkProgress);
     Spicetify.Player.addEventListener("songchange", onSongChange);
 
@@ -386,15 +282,22 @@
         try { mi.setState(isEnabled); mi.setName(isEnabled ? "Glide: ON ✨" : "Glide: OFF"); } catch (_) { }
     }
     try {
-        mi = new Spicetify.Menu.Item(
-            isEnabled ? "Glide: ON ✨" : "Glide: OFF", isEnabled,
-            () => { isEnabled = !isEnabled; saveSettings(); updatePb(); updateMenu(); Spicetify.showNotification(isEnabled ? "✨ Glide enabled" : "Glide disabled", !isEnabled, 2000); },
-            "enhance"
-        );
+        mi = new Spicetify.Menu.Item(isEnabled ? "Glide: ON ✨" : "Glide: OFF", isEnabled, () => {
+            isEnabled = !isEnabled; saveSettings(); updatePb(); updateMenu();
+            Spicetify.showNotification(isEnabled ? "✨ Glide enabled" : "Glide disabled", !isEnabled, 2000);
+        }, "enhance");
         mi.register();
     } catch (ex) { err("Menu:", ex); }
 
-    // ─── Settings UI — Minimal ────────────────────────────────────────
+    // ─── Settings UI — Minimal ─────────────────────────────────────────
+    //   ┌──────────────────────────────────────┐
+    //   │  Glide                          [5s] │
+    //   │  ████████─────────────────────       │
+    //   │  Seamless transition timing          │
+    //   │  ──────────────────────────────      │
+    //   │  Enable Glide            [toggle]    │
+    //   │                  Glide v3.0          │
+    //   └──────────────────────────────────────┘
     function openSettings() {
         const c = document.createElement("div");
         c.innerHTML = `
@@ -423,8 +326,7 @@
                 </div>
                 <input type="range" class="g__sl" id="g-sl" min="${MIN_TIMING}" max="${MAX_TIMING}" step="0.5" value="${timingSec}"/>
                 <div class="g__ticks">
-                    <span class="g__tick">1s</span><span class="g__tick">5s</span>
-                    <span class="g__tick">10s</span><span class="g__tick">15s</span>
+                    <span class="g__tick">1s</span><span class="g__tick">5s</span><span class="g__tick">10s</span><span class="g__tick">15s</span>
                 </div>
                 <p class="g__sub">Seamless transition timing</p>
                 <div class="g__div"></div>
@@ -432,7 +334,7 @@
                     <span class="g__lbl">Enable Glide</span>
                     <button class="g__tgl ${isEnabled ? "on" : ""}" id="g-tgl"></button>
                 </div>
-                <div class="g__foot">Glide v4.2</div>
+                <div class="g__foot">Glide v3.0</div>
             </div>`;
 
         const sl = c.querySelector("#g-sl"), val = c.querySelector("#g-val");
@@ -458,6 +360,6 @@
     autoEnableCrossfade();
     planTransition();
 
-    if (isEnabled) Spicetify.showNotification("✨ Glide v4.2", false, 2000);
-    log(`v4.2 loaded | Web Audio=${webAudioReady} | timing=${timingSec}s | AuraMix engine active`);
+    if (isEnabled) Spicetify.showNotification("✨ Glide v3.0", false, 2000);
+    log(`v3.0 loaded | timing=${timingSec}s | AuraMix smart trigger active`);
 })();
