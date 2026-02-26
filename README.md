@@ -14,7 +14,7 @@
 
 > **Demo / Preview**  
 > *(Add a GIF here showing the early skip happening and crossfade working!)*  
-> `![Glide Demo](assets/demo.png)`
+> ![Glide Demo](assets/demo.png)
 
 **Glide** is a Spicetify extension that brings true, DJ-like seamless crossfades to your Spotify desktop client. Unlike other extensions that simply ramp the volume up and down, Glide leverages **Spotify's native crossfade audio engine** to create a genuine audio overlap where the next track starts playing *before* the current one ends.
 
@@ -25,7 +25,7 @@
 - **Built-in UI**: Features a clean, Spotify-themed settings modal accessible directly from the Playbar.
   
   *(Add a screenshot of the settings UI here)*  
-  `![Glide Settings UI](assets/settings-ui.png)`
+  ![Glide Settings UI](assets/settings-ui.png)
 
 - **Customizable Timings**: Adjust the early start trigger and crossfade duration independently (1–15 seconds).
 - **Profile Menu Integration**: Quick toggle to enable/disable Glide right from your Spotify profile dropdown.
