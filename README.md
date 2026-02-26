@@ -19,8 +19,7 @@
 - **Apple Music-Style "Early Skip"**: The next song begins playing X seconds before the current song finishes, creating a perfect overlap.
 - **True Audio Mixing**: Uses Spotify's internal audio engine for a native, zero-latency crossfade. No volume manipulation hacks.
 - **Built-in UI**: Features a clean, Spotify-themed settings modal accessible directly from the Playbar.
-  
-  *(Add a screenshot of the settings UI here)*  
+
   ![Glide Settings UI](assets/settings-ui.png)
 
 - **Customizable Timing**: A single Glide slider (1–15 seconds) controls exactly when the next track starts early. The backend automatically syncs this duration with Spotify's native crossfade settings in the background.
