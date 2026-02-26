@@ -412,7 +412,7 @@
     startHeartbeat();
 
     if (isEnabled) {
-        Spicetify.showNotification("✨ Glide v3.0 — Apple Music transitions active");
+        Spicetify.showNotification("✨ Glide v3.1 — Apple Music transitions active");
     }
 
     log("v3.0 loaded!", {
