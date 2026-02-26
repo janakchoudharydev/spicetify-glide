@@ -102,3 +102,6 @@ By simply skipping early and letting Spotify handle the audio mixing, you get a 
 ## 📜 License
 
 MIT License. Free to use, modify, and distribute. Developed for the Spicetify community.
+
+---
+*created with ❤️ by Janak Choudhary*
