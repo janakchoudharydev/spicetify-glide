@@ -415,7 +415,7 @@
         Spicetify.showNotification("✨ Glide v3.1 — Apple Music transitions active");
     }
 
-    log("v3.0 loaded!", {
+    log("v3.1 loaded!", {
         enabled: isEnabled,
         earlyStart: earlyStartSec + "s",
         crossfade: crossfadeSec + "s",
