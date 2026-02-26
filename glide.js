@@ -1,6 +1,6 @@
 // NAME: Glide
 // AUTHOR: Project Glide
-// VERSION: 3.0.0
+// VERSION: 3.1.0
 // DESCRIPTION: Apple Music-style seamless transitions. Uses Spotify's native crossfade engine for true audio overlap + early skip for the next song to start before the current one ends.
 
 /// <reference path="../cli/globals.d.ts" />
@@ -293,7 +293,7 @@
                     <span class="g__lbl">Enable Glide</span>
                     <button class="g__tgl ${isEnabled ? "on" : ""}" id="g-toggle"></button>
                 </div>
-                <div class="g__foot">Glide v3.0</div>
+                <div class="g__foot">Glide v3.1</div>
             </div>`;
 
         const sl = container.querySelector("#g-sl");
