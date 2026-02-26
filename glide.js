@@ -254,173 +254,59 @@
         log("Song changed — ready for next glide");
     }
 
-    // ─── Settings UI ─────────────────────────────────────────────────
+    // ─── Settings UI — Minimal ─────────────────────────────────────────
     function openSettingsModal() {
-        const cfStatusText = spotifyCrossfadeStatus === "enabled"
-            ? "✅ Spotify crossfade is active"
-            : spotifyCrossfadeStatus === "manual"
-                ? "⚠️ Please enable crossfade in Spotify Settings → Playback"
-                : "🔄 Checking crossfade status...";
-
-        const cfStatusColor = spotifyCrossfadeStatus === "enabled"
-            ? "#1DB954"
-            : spotifyCrossfadeStatus === "manual"
-                ? "#f59e0b"
-                : "#888";
-
         const container = document.createElement("div");
         container.innerHTML = `
             <style>
-                .glide-s { padding: 16px 0; font-family: var(--font-family, 'CircularSp', sans-serif); color: var(--spice-text, #fff); }
-                .glide-s__sec { margin-bottom: 24px; }
-                .glide-s__lbl { display:flex; align-items:center; justify-content:space-between; font-size:14px; font-weight:600; margin-bottom:8px; }
-                .glide-s__sub { font-size:12px; color:var(--spice-subtext,#b3b3b3); margin-bottom:12px; line-height:1.4; }
-                .glide-s__val { font-size:14px; font-weight:700; color:#1DB954; min-width:32px; text-align:right; }
-                .glide-s__sw { position:relative; width:100%; height:36px; display:flex; align-items:center; }
-                .glide-s__sl {
-                    -webkit-appearance:none; appearance:none; width:100%; height:6px;
-                    border-radius:3px; background:var(--spice-button-disabled,#535353);
-                    outline:none; cursor:pointer;
-                }
-                .glide-s__sl::-webkit-slider-thumb {
-                    -webkit-appearance:none; appearance:none;
-                    width:16px; height:16px; border-radius:50%; background:#1DB954;
-                    cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,.3);
-                    transition: transform .15s, box-shadow .15s;
-                }
-                .glide-s__sl::-webkit-slider-thumb:hover { transform:scale(1.2); box-shadow:0 2px 8px rgba(29,185,84,.4); }
-                .glide-s__sl:active::-webkit-slider-thumb { transform:scale(1.3); }
-                .glide-s__ticks { display:flex; justify-content:space-between; padding:0 4px; margin-top:4px; }
-                .glide-s__tick { font-size:10px; color:var(--spice-subtext,#b3b3b3); opacity:.6; }
-                .glide-s__div { height:1px; background:var(--spice-button-disabled,#333); margin:16px 0; }
-                .glide-s__tr { display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-top:1px solid var(--spice-button-disabled,#333); }
-                .glide-s__tt { font-size:14px; font-weight:600; }
-                .glide-s__tg {
-                    position:relative; width:40px; height:22px;
-                    background:var(--spice-button-disabled,#535353); border-radius:11px;
-                    border:none; cursor:pointer; transition:background .25s; padding:0;
-                }
-                .glide-s__tg.on { background:#1DB954; }
-                .glide-s__tg::after {
-                    content:''; position:absolute; top:2px; left:2px;
-                    width:18px; height:18px; border-radius:50%; background:#fff;
-                    transition:transform .25s; box-shadow:0 1px 3px rgba(0,0,0,.3);
-                }
-                .glide-s__tg.on::after { transform:translateX(18px); }
-                .glide-s__status {
-                    display:flex; align-items:center; gap:8px;
-                    padding:10px 12px; border-radius:8px;
-                    background:rgba(29,185,84,.08); border:1px solid rgba(29,185,84,.15);
-                    margin-bottom:16px; font-size:12px;
-                }
-                .glide-s__dot {
-                    width:8px; height:8px; border-radius:50%;
-                    animation: g-pulse 2s ease-in-out infinite;
-                }
-                @keyframes g-pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-                .glide-s__test {
-                    width:100%; padding:10px; border:1px solid rgba(29,185,84,.3);
-                    border-radius:8px; background:rgba(29,185,84,.1); color:#1DB954;
-                    font-size:13px; font-weight:600; cursor:pointer;
-                    transition:all .2s; margin-top:12px;
-                }
-                .glide-s__test:hover { background:rgba(29,185,84,.2); border-color:rgba(29,185,84,.5); }
-                .glide-s__info {
-                    padding:10px 12px; border-radius:8px; margin-top:12px;
-                    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
-                    font-size:11px; color:var(--spice-subtext,#b3b3b3); line-height:1.5;
-                }
-                .glide-s__foot { font-size:11px; color:var(--spice-subtext,#b3b3b3); opacity:.5; text-align:center; margin-top:12px; }
+                .g{padding:8px 0 4px;font-family:var(--font-family,'CircularSp',sans-serif);color:var(--spice-text,#fff)}
+                .g__row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+                .g__lbl{font-size:14px;font-weight:700}
+                .g__val{font-size:14px;font-weight:700;color:#1DB954;min-width:28px;text-align:right}
+                .g__sub{font-size:11px;color:var(--spice-subtext,#b3b3b3);margin-bottom:14px}
+                .g__sl{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:var(--spice-button-disabled,#535353);outline:none;cursor:pointer;margin:10px 0 6px}
+                .g__sl::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:#1DB954;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.4);transition:transform .15s}
+                .g__sl::-webkit-slider-thumb:hover{transform:scale(1.25)}
+                .g__ticks{display:flex;justify-content:space-between;margin-bottom:20px}
+                .g__tick{font-size:10px;color:var(--spice-subtext,#b3b3b3);opacity:.5}
+                .g__div{height:1px;background:rgba(255,255,255,.08);margin:4px 0 14px}
+                .g__tgl{position:relative;width:38px;height:20px;background:var(--spice-button-disabled,#535353);border-radius:10px;border:none;cursor:pointer;transition:background .2s;padding:0;flex-shrink:0}
+                .g__tgl.on{background:#1DB954}
+                .g__tgl::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+                .g__tgl.on::after{transform:translateX(18px)}
+                .g__foot{font-size:11px;color:var(--spice-subtext,#b3b3b3);opacity:.4;text-align:center;margin-top:18px}
             </style>
-            <div class="glide-s">
-                <div class="glide-s__status" style="color:${cfStatusColor}">
-                    <div class="glide-s__dot" style="background:${cfStatusColor}"></div>
-                    <span>${cfStatusText}</span>
+            <div class="g">
+                <div class="g__row">
+                    <span class="g__lbl">Glide</span>
+                    <span class="g__val" id="g-val">${earlyStartSec}s</span>
                 </div>
-
-                <div class="glide-s__sec">
-                    <div class="glide-s__lbl">
-                        <span>⏮️ Early Start</span>
-                        <span class="glide-s__val" id="g-early-val">${earlyStartSec}s</span>
-                    </div>
-                    <div class="glide-s__sub">
-                        How many seconds before Song A ends to skip to Song B. This is the Apple Music "overlap" — the next track starts early.
-                    </div>
-                    <div class="glide-s__sw">
-                        <input type="range" class="glide-s__sl" id="g-early-sl"
-                            min="${MIN_EARLY}" max="${MAX_EARLY}" step="0.5" value="${earlyStartSec}" />
-                    </div>
-                    <div class="glide-s__ticks">
-                        <span class="glide-s__tick">1s</span>
-                        <span class="glide-s__tick">5s</span>
-                        <span class="glide-s__tick">10s</span>
-                        <span class="glide-s__tick">15s</span>
-                    </div>
+                <input type="range" class="g__sl" id="g-sl"
+                    min="${MIN_EARLY}" max="${MAX_EARLY}" step="0.5" value="${earlyStartSec}"/>
+                <div class="g__ticks">
+                    <span class="g__tick">1s</span><span class="g__tick">5s</span>
+                    <span class="g__tick">10s</span><span class="g__tick">15s</span>
                 </div>
-
-                <div class="glide-s__div"></div>
-
-                <div class="glide-s__sec">
-                    <div class="glide-s__lbl">
-                        <span>🔊 Crossfade Duration</span>
-                        <span class="glide-s__val" id="g-cf-val">${crossfadeSec}s</span>
-                    </div>
-                    <div class="glide-s__sub">
-                        How long Spotify's native crossfade lasts. This controls the audio overlap where both songs play simultaneously.
-                    </div>
-                    <div class="glide-s__sw">
-                        <input type="range" class="glide-s__sl" id="g-cf-sl"
-                            min="${MIN_CF}" max="${MAX_CF}" step="0.5" value="${crossfadeSec}" />
-                    </div>
-                    <div class="glide-s__ticks">
-                        <span class="glide-s__tick">1s</span>
-                        <span class="glide-s__tick">4s</span>
-                        <span class="glide-s__tick">8s</span>
-                        <span class="glide-s__tick">12s</span>
-                    </div>
+                <p class="g__sub">Seamless transition timing</p>
+                <div class="g__div"></div>
+                <div class="g__row">
+                    <span class="g__lbl">Enable Glide</span>
+                    <button class="g__tgl ${isEnabled ? "on" : ""}" id="g-toggle"></button>
                 </div>
+                <div class="g__foot">Glide v3.0</div>
+            </div>`;
 
-                <div class="glide-s__div"></div>
-
-                <div class="glide-s__tr">
-                    <span class="glide-s__tt">Enable Glide</span>
-                    <button class="glide-s__tg ${isEnabled ? "on" : ""}" id="g-toggle"></button>
-                </div>
-
-                <button class="glide-s__test" id="g-test">🧪 Test Early Skip Now</button>
-
-                <div class="glide-s__info">
-                    💡 <strong>How it works:</strong> Glide skips to the next track early, and Spotify's native crossfade engine handles the audio overlap. For best results, also enable crossfade in <strong>Spotify Settings → Playback → Crossfade songs</strong> and set it to match the duration above.
-                </div>
-
-                <div class="glide-s__foot">Glide v3.0 — Apple Music Transitions for Spotify</div>
-            </div>
-        `;
-
-        // Early Start slider
-        const earlySl = container.querySelector("#g-early-sl");
-        const earlyVal = container.querySelector("#g-early-val");
-        earlySl.addEventListener("input", () => {
-            const v = parseFloat(earlySl.value);
-            earlyVal.textContent = `${v}s`;
+        const sl = container.querySelector("#g-sl");
+        const val = container.querySelector("#g-val");
+        sl.addEventListener("input", () => {
+            const v = parseFloat(sl.value);
+            val.textContent = `${v}s`;
             earlyStartSec = v;
+            crossfadeSec = v;   // keep crossfade in sync with the single slider
             saveSettings();
-            log("Early start →", v + "s");
+            enableSpotifyCrossfade(); // silently sync Spotify's crossfade duration
         });
 
-        // Crossfade Duration slider
-        const cfSl = container.querySelector("#g-cf-sl");
-        const cfVal = container.querySelector("#g-cf-val");
-        cfSl.addEventListener("input", () => {
-            const v = parseFloat(cfSl.value);
-            cfVal.textContent = `${v}s`;
-            crossfadeSec = v;
-            saveSettings();
-            enableSpotifyCrossfade(); // Try to sync with Spotify
-            log("Crossfade duration →", v + "s");
-        });
-
-        // Toggle
         const toggle = container.querySelector("#g-toggle");
         toggle.addEventListener("click", () => {
             isEnabled = !isEnabled;
@@ -434,14 +320,8 @@
             );
         });
 
-        // Test button
-        container.querySelector("#g-test").addEventListener("click", () => {
-            Spicetify.PopupModal.hide();
-            testSkip();
-        });
-
         Spicetify.PopupModal.display({
-            title: "⚡ Glide Settings",
+            title: "⚡ Glide",
             content: container,
         });
     }
