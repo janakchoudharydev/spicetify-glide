@@ -24,13 +24,6 @@
         return;
     }
 
-    // Also need a real <audio> element in the DOM
-    const audioEl = document.querySelector("audio");
-    if (!audioEl) {
-        setTimeout(Glide, 500);
-        return;
-    }
-
     // ─── Logger ──────────────────────────────────────────────────────
     const TAG = "[AuraMix]";
     const log = (...a) => console.log(`%c${TAG}`, "color:#1DB954;font-weight:bold", ...a);
@@ -55,11 +48,18 @@
     //
     //   <audio> ──► MediaElementSource ──► GainNode ──► AudioContext.destination
     //
+    // IMPORTANT: We initialize lazily — only when the first transition fires.
+    // The <audio> element may not exist at Spicetify extension load time.
+    //
     let audioCtx = null;
     let gainNode = null;
     let mediaSource = null;
+    let webAudioReady = false;
 
     function initWebAudio() {
+        if (webAudioReady) return true;  // already initialized
+        const audioEl = document.querySelector("audio");
+        if (!audioEl) { warn("No <audio> element found — web audio unavailable"); return false; }
         try {
             audioCtx = new AudioContext();
             mediaSource = audioCtx.createMediaElementSource(audioEl);
@@ -67,6 +67,7 @@
             gainNode.gain.value = 1;
             mediaSource.connect(gainNode);
             gainNode.connect(audioCtx.destination);
+            webAudioReady = true;
             log("✅ Web Audio GainNode injected into Spotify's audio pipeline");
             return true;
         } catch (ex) {
@@ -75,8 +76,6 @@
             return false;
         }
     }
-
-    const webAudioReady = initWebAudio();
 
     // Smooth gain ramp — exponential sounds more natural than linear
     function rampGain(targetValue, durationSec) {
@@ -255,6 +254,9 @@
         if (isTransitioning) return;
         isTransitioning = true;
         hasTriggered = true;
+
+        // Lazy-initialize Web Audio now that Spotify is definitely playing audio
+        if (!webAudioReady) initWebAudio();
 
         const remaining = Spicetify.Player.getDuration() - Spicetify.Player.getProgress();
         log(`⏭ Transition | Song A has ${(remaining / 1000).toFixed(1)}s left`);
