@@ -50,10 +50,13 @@ You must have [Spicetify](https://spicetify.app/) installed and configured on yo
 
 ## ⚙️ Setup & Configuration
 
-**✨ It Just Works!**  
-For Glide to work its magic, Spotify's built-in crossfade engine needs to be on. Glide **automatically enables this in the background** for you!
+**⚠️ Important Setup Step:**  
+For Glide to work its magic, you must **manually enable Spotify's native crossfade option** first.
 
-You never have to touch Spotify's settings. Just use the Glide UI.
+1. Open Spotify Settings (`Cmd/Ctrl + ,`)
+2. Scroll to **Playback**
+3. Toggle **Crossfade songs** to ON.
+*(Note: The developer of Glide will fully automate this in a future update!)*
 
 ### Using the Glide UI
 
