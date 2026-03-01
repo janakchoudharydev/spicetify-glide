@@ -1,7 +1,7 @@
 // NAME: Glide
 // AUTHOR: Project Glide
-// VERSION: 3.1.0
-// DESCRIPTION: Apple Music-style seamless transitions. Uses Spotify's native crossfade engine for true audio overlap + early skip for the next song to start before the current one ends.
+// VERSION: 3.2.0
+// DESCRIPTION: Apple Music-style seamless transitions. True audio overlap via native crossfade.
 
 /// <reference path="../cli/globals.d.ts" />
 
@@ -55,6 +55,7 @@
 
     // ─── State ────────────────────────────────────────────────────────
     let isEnabled = true;
+    let smartGapless = true;        // v3.2: Disable crossfade for consecutive album tracks
     let earlyStartSec = DEFAULT_EARLY;
     let crossfadeSec = DEFAULT_CF;
     let hasSkipped = false;         // Prevents re-triggering for the same song
@@ -66,6 +67,9 @@
         try {
             const e = Spicetify.LocalStorage.get(STORAGE.ENABLED);
             if (e !== null) isEnabled = e === "true";
+
+            const sg = Spicetify.LocalStorage.get("glide:smartGapless");
+            if (sg !== null) smartGapless = sg === "true";
 
             const es = Spicetify.LocalStorage.get(STORAGE.EARLY_START);
             if (es !== null) {
@@ -88,6 +92,7 @@
     function saveSettings() {
         try {
             Spicetify.LocalStorage.set(STORAGE.ENABLED, String(isEnabled));
+            Spicetify.LocalStorage.set("glide:smartGapless", String(smartGapless));
             Spicetify.LocalStorage.set(STORAGE.EARLY_START, String(earlyStartSec));
             Spicetify.LocalStorage.set(STORAGE.CROSSFADE_DURATION, String(crossfadeSec));
         } catch (e) {
@@ -230,6 +235,25 @@
         if (duration < earlyMs * 2) return;
 
         if (remaining <= earlyMs) {
+            // v3.2: Smart Album Gapless Bypass
+            if (smartGapless && Spicetify.Queue?.nextTracks?.length > 0) {
+                const currentTrackUri = Spicetify.Player.data?.item?.uri;
+                const nextTrackUri = Spicetify.Queue.nextTracks[0]?.uri;
+                const currentAlbumUri = Spicetify.Player.data?.item?.album?.uri;
+                const nextAlbumUri = Spicetify.Queue.nextTracks[0]?.contextTrack?.metadata?.album_uri;
+
+                // Ensure it's not a single track on loop (Repeat One) before applying the album bypass
+                const isRepeatOne = Spicetify.Player.getRepeat() === 2;
+
+                if (!isRepeatOne && currentAlbumUri && nextAlbumUri && currentAlbumUri === nextAlbumUri) {
+                    // Suppress early skip! Native gapless will handle the transition.
+                    log(`📦 Smart Album Gapless: Suppressing early skip for identical album URIs (${currentAlbumUri}).`);
+                    hasSkipped = true; // Mark as skipped so we don't keep logging this thousands of times
+                    lastSkippedUri = currentTrackUri || "unknown";
+                    return;
+                }
+            }
+
             log(`⏱ Trigger! remaining=${(remaining / 1000).toFixed(1)}s ≤ earlyStart=${earlyStartSec}s`);
             triggerEarlySkip();
         }
@@ -289,11 +313,18 @@
                 </div>
                 <p class="g__sub">Seamless transition timing</p>
                 <div class="g__div"></div>
-                <div class="g__row">
+                
+                <div class="g__row" style="margin-bottom: 2px;">
+                    <span class="g__lbl">Smart Gapless (Albums)</span>
+                    <button class="g__tgl ${smartGapless ? "on" : ""}" id="g-gapless-tgl"></button>
+                </div>
+                <p class="g__sub" style="margin-bottom: 12px; margin-top: 0;">Preserve gapless playback for consecutive album tracks.</p>
+
+                <div class="g__row" style="margin-top: 6px;">
                     <span class="g__lbl">Enable Glide</span>
                     <button class="g__tgl ${isEnabled ? "on" : ""}" id="g-toggle"></button>
                 </div>
-                <div class="g__foot">Glide v3.1</div>
+                <div class="g__foot">Glide v3.2.0</div>
             </div>`;
 
         const sl = container.querySelector("#g-sl");
@@ -305,6 +336,13 @@
             crossfadeSec = v;   // keep crossfade in sync with the single slider
             saveSettings();
             enforceCrossfade(); // silently sync Spotify's crossfade duration
+        });
+
+        const gapTgl = container.querySelector("#g-gapless-tgl");
+        gapTgl.addEventListener("click", () => {
+            smartGapless = !smartGapless;
+            gapTgl.classList.toggle("on", smartGapless);
+            saveSettings();
         });
 
         const toggle = container.querySelector("#g-toggle");
@@ -400,7 +438,7 @@
     // Checks the raw GitHub manifest.json to see if a newer version is available.
     async function checkForUpdates() {
         try {
-            const currentVersion = "3.1.0";
+            const currentVersion = "3.2.0";
             const manifestUrl = "https://raw.githubusercontent.com/janakchoudharydev/spicetify-glide/main/manifest.json";
 
             const response = await fetch(manifestUrl, { cache: "no-store" });
@@ -532,13 +570,14 @@
     startHeartbeat();
 
     if (isEnabled) {
-        Spicetify.showNotification("✨ Glide v3.1 — Apple Music transitions active");
+        Spicetify.showNotification("✨ Glide v3.2.0 — Smart Album transitions active");
     }
 
-    log("v3.1 loaded!", {
+    log("v3.2.0 loaded!", {
         enabled: isEnabled,
         earlyStart: earlyStartSec + "s",
         crossfade: crossfadeSec + "s",
+        smartGapless: smartGapless,
         spotifyCrossfade: spotifyCrossfadeStatus,
     });
 
