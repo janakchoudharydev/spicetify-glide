@@ -23,6 +23,7 @@
   ![Glide Settings UI](assets/settings-ui.png)
 
 - **Customizable Timing**: A single Glide slider (1–15 seconds) controls exactly when the next track starts early. The backend automatically syncs this duration with Spotify's native crossfade settings in the background.
+- **Smart Album Gapless (v3.2)**: Glide automatically detects when you play consecutive tracks from the same album (e.g., Pink Floyd's *Dark Side of the Moon* or a Live Concert album) and temporarily disables the early skip so you can hear the album natively gapless. It turns back on seamlessly when you shuffle!
 - **Profile Menu Integration**: Quick toggle to enable/disable Glide right from your Spotify profile dropdown.
 
 ---
@@ -63,6 +64,7 @@ For Glide to work its magic, you must **manually enable Spotify's native crossfa
 Once installed, you'll see a lightning bolt icon (⚡) in your Spotify playbar. Click it to open the **Glide Settings**:
 
 - **Glide 🔊**: A single slider that controls how many seconds before the current song ends to skip to the next song. This defines the duration of the audio overlap.
+- **Smart Gapless (Albums)**: Keep this ON to preserve native 0-second gapless playback for cohesive albums. Turn it OFF if you want to aggressively crossfade everything.
 - **Enable Glide**: A master toggle to quickly turn transitions on or off.
 
 ---
