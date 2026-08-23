@@ -20,7 +20,7 @@
 - **True Audio Mixing**: Uses Spotify's internal audio engine for a native, zero-latency crossfade. No volume manipulation hacks.
 - **Built-in UI**: Features a clean, Spotify-themed settings modal accessible directly from the Playbar.
 
-  ![Glide Settings UI](assets/settings-ui.png)!
+  ![Glide Settings UI](assets/settings-ui.png)
 
 - **Customizable Timing**: A single Glide slider (1–15 seconds) controls exactly when the next track starts early. The backend automatically syncs this duration with Spotify's native crossfade settings in the background.
 - **Smart Album Gapless (v3.2)**: Glide automatically detects when you play consecutive tracks from the same album (e.g., Pink Floyd's *Dark Side of the Moon* or a Live Concert album) and temporarily disables the early skip so you can hear the album natively gapless. It turns back on seamlessly when you shuffle!
